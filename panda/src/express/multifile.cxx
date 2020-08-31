@@ -103,9 +103,7 @@ const size_t Multifile::_encrypt_header_size = 6;
  *
  */
 Multifile::
-Multifile() :
-  _read_filew(_read_file),
-  _read_write_filew(_read_write_file)
+Multifile()
 {
   ConfigVariableInt multifile_encryption_iteration_count
     ("multifile-encryption-iteration-count", 0,
@@ -216,12 +214,16 @@ open_write(const Filename &multifile_name) {
   close();
   Filename fname = multifile_name;
   fname.set_binary();
-  if (!fname.open_write(_write_file, true)) {
+  std::ofstream *multifile_stream;
+
+  if (!fname.open_write(*multifile_stream)) {
     return false;
   }
+
   _timestamp = time(nullptr);
   _timestamp_dirty = true;
-  _write = &_write_file;
+  _write = multifile_stream;
+  _owns_stream = true;
   _multifile_name = multifile_name;
   return true;
 }
@@ -259,18 +261,25 @@ open_read_write(const Filename &multifile_name) {
   close();
   Filename fname = multifile_name;
   fname.set_binary();
+
   bool exists = fname.exists();
-  if (!fname.open_read_write(_read_write_file)) {
+  std::fstream *multifile_stream;
+
+  if (!fname.open_read_write(*multifile_stream)) {
     return false;
   }
+
   if (exists) {
     _timestamp = fname.get_timestamp();
   } else {
     _timestamp = time(nullptr);
   }
+
   _timestamp_dirty = true;
-  _read = &_read_write_filew;
-  _write = &_read_write_file;
+  _read = new StreamWrapper(multifile_stream, true);
+  _write = multifile_stream;
+  _owns_stream = true;
+  _offset = 0;
   _multifile_name = multifile_name;
 
   if (exists) {
@@ -302,6 +311,7 @@ open_read_write(iostream *multifile_stream, bool owns_pointer) {
   _read = new StreamWrapper(multifile_stream, owns_pointer);
   _write = multifile_stream;
   _owns_stream = true;  // Because we own the StreamWrapper, above.
+  _offset = 0;
   _write->seekp(0, ios::beg);
 
   // Check whether the read stream is empty.
@@ -357,9 +367,6 @@ close() {
   _file_major_ver = 0;
   _file_minor_ver = 0;
 
-  _read_file.close();
-  _write_file.close();
-  _read_write_file.close();
   _multifile_name = Filename();
 
   clear_subfiles();

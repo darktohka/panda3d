@@ -256,11 +256,6 @@ private:
   int _encryption_key_length;
   int _encryption_iteration_count;
 
-  pifstream _read_file;
-  IStreamWrapper _read_filew;
-  pofstream _write_file;
-  pfstream _read_write_file;
-  StreamWrapper _read_write_filew;
   Filename _multifile_name;
   std::string _header_prefix;
 
